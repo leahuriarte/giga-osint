@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+.env.*
+.cache/
+data/
+*.sqlite3
+.vector_cache/
+.chromadb/
+.qdrant/
+.vscode/
+.DS_Store
