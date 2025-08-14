@@ -22,8 +22,6 @@ sentence-transformers>=3.0.1
 rank-bm25>=0.2
 chromadb>=0.5,<0.6
 
-# optional: if you want local rerank later, use CrossEncoder from sentence-transformers (no extra pip)
-
 # graph + clustering
 networkx>=3.3
 python-louvain>=0.16
