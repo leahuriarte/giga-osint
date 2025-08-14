@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>giga-osint</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; line-height: 1.35; }
+    input, button { font-size: 16px; }
+    .row { display: flex; gap: 24px; align-items: flex-start; }
+    .col { flex: 1; min-width: 320px; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px 16px; }
+    .small { color: #666; font-size: 13px; }
+    code { background: #f5f5f5; padding: 2px 4px; border-radius: 4px; }
+    ul { padding-left: 18px; }
+    .src { font-size: 14px; margin-bottom: 6px; }
+    .pill { display:inline-block; background:#eef; border-radius:999px; padding:2px 8px; margin-right:6px; }
+  </style>
+</head>
+<body>
+  <h2>giga-osint</h2>
+  <div class="card">
+    <form id="qform">
+      <input id="q" name="q" placeholder="ask a question (e.g., major breaches last 14 days)" style="width:60%"/>
+      <label><input type="checkbox" id="expand" checked/> expand via entities</label>
+      <button type="submit">brief me</button>
+      <button id="dl" type="button">download .md</button>
+    </form>
+    <div class="small">mvp: hybrid retrieval (bm25 ∪ vector) + rerank + temporal + graph-bias + raptor nodes + verification</div>
+  </div>
+
+  <div class="row" style="margin-top:16px;">
+    <div class="col card">
+      <h3>brief</h3>
+      <pre id="brief" style="white-space:pre-wrap"></pre>
+      <div id="verif" class="small"></div>
+      <h4>sources</h4>
+      <div id="sources"></div>
+    </div>
+    <div class="col card">
+      <h3>timeline</h3>
+      <pre id="timeline" style="white-space:pre-wrap"></pre>
+      <h4>top entities</h4>
+      <div id="entities"></div>
+    </div>
+  </div>
+
+<script>
+async function post(path, body){
+  const r = await fetch(path, {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body)});
+  if(!r.ok){ throw new Error(await r.text()); }
+  return r.json();
+}
+async function get(path){
+  const r = await fetch(path);
+  if(!r.ok){ throw new Error(await r.text()); }
+  return r.json();
+}
+async function run(){
+  const q = document.getElementById('q').value.trim();
+  const expand = document.getElementById('expand').checked;
+  if(!q) return;
+  const req = { q, k: 12, expand };
+  document.getElementById('brief').textContent = '…thinking…';
+  document.getElementById('timeline').textContent = '…building…';
+  try {
+    const [b, t, e] = await Promise.all([
+      post('/api/brief', req),
+      post('/api/timeline', { q, k: 40 }),
+      get('/api/entities?top=20')
+    ]);
+    document.getElementById('brief').textContent =
+  (b.summary && b.summary.trim().length)
+    ? b.summary
+    : JSON.stringify(b, null, 2);
+  document.getElementById('verif').textContent =
+    `verification: ${v.overall_confidence || 'unknown'}${v.notes ? ' — ' + v.notes : ''}`;
+  const srcDiv = document.getElementById('sources');
+  srcDiv.innerHTML = '';
+  (b.sources || []).forEach(s => {
+    const d = document.createElement('div');
+    d.className = 'src';
+    d.innerHTML = `[#${s.n}] <a href="${s.url}" target="_blank">${s.title || s.url}</a>
+      <span class="small">${s.published_at || ''}</span><br/><span class="small">${s.snippet || ''}</span>`;
+    srcDiv.appendChild(d);
+  });
+    document.getElementById('timeline').textContent =
+    (t.timeline_text && t.timeline_text.trim().length)
+        ? t.timeline_text
+        : JSON.stringify(t, null, 2);
+  (e.entities || []).forEach(x => {
+    const sp = document.createElement('span'); sp.className = 'pill'; sp.textContent = `${x.name} (${x.degree})`;
+    entsDiv.appendChild(sp);
+  });
+    } catch (err) {
+    document.getElementById('brief').textContent = `error: ${err}`;
+    document.getElementById('timeline').textContent = '';
+    return;
+  }
+}
+document.getElementById('qform').addEventListener('submit', (ev) => { ev.preventDefault(); run(); });
+document.getElementById('dl').addEventListener('click', () => {
+  const q = document.getElementById('q').value.trim();
+  const expand = document.getElementById('expand').checked;
+  const form = document.createElement('form');
+  form.method = 'POST'; form.action = '/api/export/brief.md';
+  const f1 = document.createElement('input'); f1.type='hidden'; f1.name='q'; f1.value=q;
+  const f2 = document.createElement('input'); f2.type='hidden'; f2.name='k'; f2.value='12';
+  const f3 = document.createElement('input'); f3.type='hidden'; f3.name='expand'; f3.value=expand ? 'true':'false';
+  form.appendChild(f1); form.appendChild(f2); form.appendChild(f3);
+  document.body.appendChild(form); form.submit(); form.remove();
+});
+</script>
+</body>
+</html>
