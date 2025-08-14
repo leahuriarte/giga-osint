@@ -10,3 +10,4 @@ data/
 .qdrant/
 .vscode/
 .DS_Store
+.md
