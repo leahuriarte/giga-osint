@@ -1,5 +1,11 @@
 from pydantic_settings import BaseSettings
 from pydantic import Field
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load .env from repo root (cwd-agnostic)
+repo_root = Path(__file__).resolve().parents[2]
+load_dotenv(repo_root / ".env")
 
 class Settings(BaseSettings):
     gemini_api_key: str = Field(alias="GEMINI_API_KEY")
@@ -11,7 +17,6 @@ class Settings(BaseSettings):
     default_recent_days: int = Field(default=30, alias="DEFAULT_RECENT_DAYS")
     graph_path: str = Field(default=".graph/osint_graph.pkl", alias="GRAPH_PATH")
     use_graph_bias: bool = Field(default=True, alias="USE_GRAPH_BIAS")
-    default_recent_days: int = Field(default=30, alias="DEFAULT_RECENT_DAYS")  # if not already added
     verify_strength: int = Field(default=2, alias="VERIFY_STRENGTH")  # 1–3, higher = slower/stricter
 
 

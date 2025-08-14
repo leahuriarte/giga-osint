@@ -73,25 +73,29 @@ async function run(){
   (b.summary && b.summary.trim().length)
     ? b.summary
     : JSON.stringify(b, null, 2);
-  document.getElementById('verif').textContent =
-    `verification: ${v.overall_confidence || 'unknown'}${v.notes ? ' — ' + v.notes : ''}`;
-  const srcDiv = document.getElementById('sources');
-  srcDiv.innerHTML = '';
-  (b.sources || []).forEach(s => {
-    const d = document.createElement('div');
-    d.className = 'src';
-    d.innerHTML = `[#${s.n}] <a href="${s.url}" target="_blank">${s.title || s.url}</a>
-      <span class="small">${s.published_at || ''}</span><br/><span class="small">${s.snippet || ''}</span>`;
-    srcDiv.appendChild(d);
-  });
+    document.getElementById('verif').textContent =
+      `verification: ${b.verification?.overall_confidence || 'unknown'}${b.verification?.notes ? ' — ' + b.verification.notes : ''}`;
+    const srcDiv = document.getElementById('sources');
+    srcDiv.innerHTML = '';
+    (b.sources || []).forEach(s => {
+      const d = document.createElement('div');
+      d.className = 'src';
+      d.innerHTML = `[#${s.n}] <a href="${s.url}" target="_blank">${s.title || s.url}</a>
+        <span class="small">${s.published_at || ''}</span><br/><span class="small">${s.snippet || ''}</span>`;
+      srcDiv.appendChild(d);
+    });
     document.getElementById('timeline').textContent =
-    (t.timeline_text && t.timeline_text.trim().length)
+      (t.timeline_text && t.timeline_text.trim().length)
         ? t.timeline_text
         : JSON.stringify(t, null, 2);
-  (e.entities || []).forEach(x => {
-    const sp = document.createElement('span'); sp.className = 'pill'; sp.textContent = `${x.name} (${x.degree})`;
-    entsDiv.appendChild(sp);
-  });
+    const entsDiv = document.getElementById('entities');
+    entsDiv.innerHTML = '';
+    (e.entities || []).forEach(x => {
+      const sp = document.createElement('span'); 
+      sp.className = 'pill'; 
+      sp.textContent = `${x.name} (${x.degree})`;
+      entsDiv.appendChild(sp);
+    });
     } catch (err) {
     document.getElementById('brief').textContent = `error: ${err}`;
     document.getElementById('timeline').textContent = '';
