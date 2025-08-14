@@ -1,6 +1,9 @@
 from fastapi import APIRouter
 from typing import List, Dict, Any
+import logging
 from app.schemas import IngestRequest, IngestResult, QueryRequest, QueryResult, Hit
+
+logger = logging.getLogger(__name__)
 from ingest.rss import pull_rss
 from ingest.html_fetch import fetch_article
 from preprocess.clean import clean_text, is_trash
@@ -135,10 +138,42 @@ from synth.brief import make_brief
 from app.schemas import QueryRequest
 
 @router.post("/brief")
-def brief(req: QueryRequest):
+async def brief(req: QueryRequest):
+    # Agent-on-query: ensure corpus is fresh if auto_ingest is enabled
+    corpus_result = None
+    if req.auto_ingest:
+        try:
+            from synth.planner import ensure_corpus
+            corpus_result = await ensure_corpus(req.q, req.recent_days, req.max_urls)
+            logger.info(f"Auto-ingest complete: {corpus_result['ingested']['docs']} docs, {corpus_result['ingested']['chunks']} chunks")
+        except Exception as e:
+            logger.error(f"Auto-ingest failed: {e}")
+            # Continue with existing corpus if auto-ingest fails
+    
+    # Legacy discovery fallback (if auto_ingest is disabled but discover is enabled)
+    discovery_result = None
+    if not req.auto_ingest and req.discover:
+        try:
+            # Use simple RSS discovery instead of complex web discovery
+            from discover.rss_discovery import quick_ingest_breaking_news
+            discovery_result = await quick_ingest_breaking_news(req.q, max_items=5)
+        except Exception as e:
+            logger.error(f"RSS discovery failed: {e}")
+            # Continue with existing corpus if discovery fails
+    
+    # Generate brief (with potentially new content from auto-ingest)
     result = make_brief(req.q, k=req.k, expand=req.expand)
     ver = verify_brief(result.get("summary",""), result.get("sources",[]))
     result["verification"] = ver
+    
+    # Add corpus metadata
+    if corpus_result:
+        result["corpus_update"] = corpus_result
+    
+    # Add legacy discovery metadata if used
+    if discovery_result:
+        result["discovery"] = discovery_result
+    
     return result
 from index.raptor.builder import RaptorBuilder
 
@@ -153,11 +188,62 @@ from synth.timeline import make_timeline
 def timeline(req: QueryRequest):
     return make_timeline(req.q, k=max(20, req.k))
 
+@router.post("/discover")
+async def discover_only(req: QueryRequest):
+    """Standalone discovery endpoint for testing"""
+    try:
+        from discover.orchestrator import discovery_orchestrator
+        result = await discovery_orchestrator.discover_and_ingest(
+            req.q, expand_queries=req.expand, fast_mode=req.fast_mode
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Discovery failed: {e}")
+        return {"error": str(e), "discovered_urls": 0, "ingested_docs": 0}
+
+@router.get("/knowledge/status")
+def knowledge_status():
+    """Get knowledge base growth statistics"""
+    try:
+        from discover.knowledge_tracker import knowledge_tracker
+        return knowledge_tracker.get_growth_summary()
+    except Exception as e:
+        logger.error(f"Failed to get knowledge status: {e}")
+        return {"error": str(e)}
+
+@router.get("/knowledge/stats")
+def knowledge_detailed_stats():
+    """Get detailed knowledge base statistics"""
+    try:
+        from discover.knowledge_tracker import knowledge_tracker
+        current = knowledge_tracker.get_current_stats()
+        recent_history = knowledge_tracker.stats.get("ingestion_history", [])[-20:]  # Last 20 ingestions
+        
+        return {
+            "current_state": current,
+            "total_ingestions": knowledge_tracker.stats.get("total_ingestions", 0),
+            "recent_ingestions": recent_history,
+            "entity_growth": knowledge_tracker.stats.get("entity_growth", [])[-10:],  # Last 10 snapshots
+            "knowledge_base_age": knowledge_tracker._get_age_days(),
+            "growth_velocity": knowledge_tracker._calculate_growth_velocity()
+        }
+    except Exception as e:
+        logger.error(f"Failed to get detailed knowledge stats: {e}")
+        return {"error": str(e)}
+
 from fastapi.responses import PlainTextResponse
 from synth.export import brief_to_markdown
 
 @router.post("/export/brief.md")
-def export_brief_md(req: QueryRequest):
+async def export_brief_md(req: QueryRequest):
+    # Run discovery if requested
+    if getattr(req, 'discover', True):
+        try:
+            from discover.orchestrator import discovery_orchestrator
+            await discovery_orchestrator.discover_and_ingest(req.q, expand_queries=req.expand, fast_mode=getattr(req, 'fast_mode', True))
+        except Exception as e:
+            logger.error(f"Discovery failed during export: {e}")
+    
     result = make_brief(req.q, k=req.k, expand=req.expand)
     ver = verify_brief(result.get("summary",""), result.get("sources",[]))
     result["verification"] = ver

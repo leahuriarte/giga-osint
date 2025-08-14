@@ -23,15 +23,18 @@
     <form id="qform">
       <input id="q" name="q" placeholder="ask a question (e.g., major breaches last 14 days)" style="width:60%"/>
       <label><input type="checkbox" id="expand" checked/> expand via entities</label>
+      <label><input type="checkbox" id="discover"/> breaking news</label>
+      <label><input type="checkbox" id="fastmode" checked/> fast mode (~10s)</label>
       <button type="submit">brief me</button>
       <button id="dl" type="button">download .md</button>
     </form>
-    <div class="small">mvp: hybrid retrieval (bm25 ∪ vector) + rerank + temporal + graph-bias + raptor nodes + verification</div>
+    <div class="small">osint system: rss breaking news + hybrid retrieval (bm25 ∪ vector) + rerank + temporal + graph-bias + raptor nodes + verification</div>
   </div>
 
   <div class="row" style="margin-top:16px;">
     <div class="col card">
       <h3>brief</h3>
+      <div id="discovery-status" class="small" style="margin-bottom:8px;"></div>
       <pre id="brief" style="white-space:pre-wrap"></pre>
       <div id="verif" class="small"></div>
       <h4>sources</h4>
@@ -42,6 +45,8 @@
       <pre id="timeline" style="white-space:pre-wrap"></pre>
       <h4>top entities</h4>
       <div id="entities"></div>
+      <h4>knowledge base</h4>
+      <div id="knowledge-stats" class="small"></div>
     </div>
   </div>
 
@@ -59,16 +64,31 @@ async function get(path){
 async function run(){
   const q = document.getElementById('q').value.trim();
   const expand = document.getElementById('expand').checked;
+  const discover = document.getElementById('discover').checked;
+  const fastmode = document.getElementById('fastmode').checked;
   if(!q) return;
-  const req = { q, k: 12, expand };
-  document.getElementById('brief').textContent = '…thinking…';
-  document.getElementById('timeline').textContent = '…building…';
+  const req = { q, k: 12, expand, discover, fast_mode: fastmode };
+  document.getElementById('brief').textContent = '🔍 discovering + analyzing…';
+  document.getElementById('timeline').textContent = '📅 building timeline…';
+  document.getElementById('discovery-status').textContent = '⚡ fast discovery mode active…';
   try {
-    const [b, t, e] = await Promise.all([
+    const [b, t, e, k] = await Promise.all([
       post('/api/brief', req),
       post('/api/timeline', { q, k: 40 }),
-      get('/api/entities?top=20')
+      get('/api/entities?top=20'),
+      get('/api/knowledge/status')
     ]);
+    
+    // Show discovery status if available
+    const discoveryDiv = document.getElementById('discovery-status');
+    if (b.discovery) {
+      const d = b.discovery;
+      discoveryDiv.innerHTML = `🔍 discovered ${d.ingested_docs || 0} new docs (${d.ingested_chunks || 0} chunks) in ${(d.duration_seconds || 0).toFixed(1)}s`;
+      discoveryDiv.style.color = '#0a5c2b';
+    } else {
+      discoveryDiv.textContent = '';
+    }
+    
     document.getElementById('brief').textContent =
   (b.summary && b.summary.trim().length)
     ? b.summary
@@ -96,6 +116,20 @@ async function run(){
       sp.textContent = `${x.name} (${x.degree})`;
       entsDiv.appendChild(sp);
     });
+    
+    // Show knowledge base stats
+    const knowledgeDiv = document.getElementById('knowledge-stats');
+    if (k && k.current_state) {
+      const cs = k.current_state;
+      const velocity = k.growth_velocity || {};
+      knowledgeDiv.innerHTML = `
+        📊 ${cs.total_documents || 0} docs, ${cs.total_chunks || 0} chunks, ${cs.total_entities || 0} entities<br/>
+        📈 ${k.total_ingestions || 0} discoveries, ${velocity.chunks_per_day || 0} chunks/day<br/>
+        🕒 ${k.knowledge_base_age_days ? k.knowledge_base_age_days.toFixed(1) : 0} days old
+      `;
+    } else {
+      knowledgeDiv.textContent = '📊 Knowledge base loading...';
+    }
     } catch (err) {
     document.getElementById('brief').textContent = `error: ${err}`;
     document.getElementById('timeline').textContent = '';
@@ -106,12 +140,16 @@ document.getElementById('qform').addEventListener('submit', (ev) => { ev.prevent
 document.getElementById('dl').addEventListener('click', () => {
   const q = document.getElementById('q').value.trim();
   const expand = document.getElementById('expand').checked;
+  const discover = document.getElementById('discover').checked;
+  const fastmode = document.getElementById('fastmode').checked;
   const form = document.createElement('form');
   form.method = 'POST'; form.action = '/api/export/brief.md';
   const f1 = document.createElement('input'); f1.type='hidden'; f1.name='q'; f1.value=q;
   const f2 = document.createElement('input'); f2.type='hidden'; f2.name='k'; f2.value='12';
   const f3 = document.createElement('input'); f3.type='hidden'; f3.name='expand'; f3.value=expand ? 'true':'false';
-  form.appendChild(f1); form.appendChild(f2); form.appendChild(f3);
+  const f4 = document.createElement('input'); f4.type='hidden'; f4.name='discover'; f4.value=discover ? 'true':'false';
+  const f5 = document.createElement('input'); f5.type='hidden'; f5.name='fast_mode'; f5.value=fastmode ? 'true':'false';
+  form.appendChild(f1); form.appendChild(f2); form.appendChild(f3); form.appendChild(f4); form.appendChild(f5);
   document.body.appendChild(form); form.submit(); form.remove();
 });
 </script>

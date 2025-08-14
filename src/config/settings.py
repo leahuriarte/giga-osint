@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from pydantic import Field
+from typing import Optional
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -18,6 +19,10 @@ class Settings(BaseSettings):
     graph_path: str = Field(default=".graph/osint_graph.pkl", alias="GRAPH_PATH")
     use_graph_bias: bool = Field(default=True, alias="USE_GRAPH_BIAS")
     verify_strength: int = Field(default=2, alias="VERIFY_STRENGTH")  # 1–3, higher = slower/stricter
+    
+    # Discovery API keys (optional)
+    serpapi_api_key: Optional[str] = Field(default=None, alias="SERPAPI_API_KEY")
+    exa_api_key: Optional[str] = Field(default=None, alias="EXA_API_KEY")
 
 
 

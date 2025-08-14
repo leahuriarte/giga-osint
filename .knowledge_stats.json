@@ -1,0 +1,33 @@
+{
+  "created_at": "2025-08-14T06:48:36.911044+00:00",
+  "total_ingestions": 2,
+  "total_documents": 0,
+  "total_chunks": 0,
+  "total_entities": 0,
+  "ingestion_history": [
+    {
+      "timestamp": "2025-08-14T06:57:07.027428+00:00",
+      "query": "major breaches this week",
+      "discovered_urls": 40,
+      "ingested_docs": 12,
+      "ingested_chunks": 68,
+      "duration_seconds": 510.113816,
+      "total_docs_after": 0,
+      "total_chunks_after": 0,
+      "total_entities_after": 0
+    },
+    {
+      "timestamp": "2025-08-14T06:58:53.468638+00:00",
+      "query": "major breaches this week",
+      "discovered_urls": 5,
+      "ingested_docs": 5,
+      "ingested_chunks": 29,
+      "duration_seconds": 11.68788,
+      "total_docs_after": 0,
+      "total_chunks_after": 0,
+      "total_entities_after": 0
+    }
+  ],
+  "entity_growth": [],
+  "last_updated": "2025-08-14T06:58:53.468638+00:00"
+}

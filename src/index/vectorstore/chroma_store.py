@@ -82,7 +82,9 @@ class ChromaStore:
         except Exception as e:
             # heal on persisted-index schema/dimensionality issues
             msg = str(e)
-            if "dimensionality" in msg or "HNSW" in msg or "persist" in msg:
+            if ("dimensionality" in msg or "HNSW" in msg or "persist" in msg or 
+                "does not exist" in msg or "InvalidCollection" in msg):
+                logger.warning(f"ChromaDB collection issue, resetting: {msg}")
                 self.col = self._reset_collection()
                 # return empty results after repair to avoid 500s; caller can degrade gracefully
                 return {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
@@ -92,7 +94,10 @@ class ChromaStore:
         try:
             return self.col.get(limit=limit, include=["documents", "metadatas"])
         except Exception as e:
-            if "dimensionality" in str(e) or "persist" in str(e):
+            msg = str(e)
+            if ("dimensionality" in msg or "persist" in msg or 
+                "does not exist" in msg or "InvalidCollection" in msg):
+                logger.warning(f"ChromaDB fetch issue, resetting: {msg}")
                 self.col = self._reset_collection()
                 return {"ids": [], "documents": [], "metadatas": []}
             raise
